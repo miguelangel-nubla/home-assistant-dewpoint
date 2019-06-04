@@ -11,9 +11,10 @@ import asyncio
 import voluptuous as vol
 
 
+from homeassistant import util
 from homeassistant.core import callback
 from homeassistant.const import (
-    TEMP_CELSIUS, ATTR_FRIENDLY_NAME, ATTR_ENTITY_ID, CONF_SENSORS,
+    TEMP_CELSIUS, TEMP_FAHRENHEIT, ATTR_FRIENDLY_NAME, ATTR_ENTITY_ID, CONF_SENSORS,
     EVENT_HOMEASSISTANT_START, ATTR_UNIT_OF_MEASUREMENT, ATTR_TEMPERATURE)
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change
@@ -102,10 +103,25 @@ class DewPointSensor(Entity):
         state = self.hass.states.get(entity)
 
         if state.state is None or state.state == 'unknown':
-            _LOGGER.error('Unable to read temperature from unavailable sensor: %s', self._entity_dry_temp)
+            _LOGGER.error('Unable to read temperature from unavailable sensor: %s', state.entity_id)
             return
 
         unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        temp = util.convert(state.state, float)
+
+        if temp is None:
+            _LOGGER.error("Unable to parse temperature sensor %s with state:"
+                          " %s", state.entity_id, state.state)
+            return None
+
+        # convert to celsius if necessary
+        if unit == TEMP_FAHRENHEIT:
+            return util.temperature.fahrenheit_to_celsius(temp)
+        if unit == TEMP_CELSIUS:
+            return temp
+        _LOGGER.error("Temp sensor %s has unsupported unit: %s (allowed: %s, "
+                      "%s)", state.entity_id, unit, TEMP_CELSIUS,
+                      TEMP_FAHRENHEIT)
 
         try:
             return self.hass.config.units.temperature(
@@ -118,21 +134,37 @@ class DewPointSensor(Entity):
         state = self.hass.states.get(entity)
 
         if state.state is None or state.state == 'unknown':
-            _LOGGER.error('Unable to read relative humidity from unavailable sensor: %s', self._entity_dry_temp)
+            _LOGGER.error('Unable to read relative humidity from unavailable sensor: %s', state.entity_id)
             return
 
-        try:
-            return float(state.state)/100
-        except ValueError as ex:
-            _LOGGER.error('Unable to read relative humidity from sensor: %s', ex)
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        hum = util.convert(state.state, float)
+
+        if hum is None:
+            _LOGGER.error("Unable to read relative humidity from sensor %s, state: %s",
+                          state.entity_id, state.state)
+            return None
+
+        if unit != '%':
+            _LOGGER.error("Humidity sensor %s has unsupported unit: %s %s",
+                          state.entity_id, unit, " (allowed: %)")
+            return None
+
+        if hum > 100 or hum < 0:
+            _LOGGER.error("Humidity sensor %s is out of range: %s %s",
+                          state.entity_id, hum, "(allowed: 0-100%)")
+            return None
+
+        return hum/100
 
     async def async_update(self):
         """Fetch new state data for the sensor."""
 
         dry_temp = self.get_dry_temp(self._entity_dry_temp)
         rel_hum = self.get_rel_hum(self._entity_rel_hum)
-        if dry_temp and rel_hum:
+        
+        if dry_temp is not None and rel_hum is not None:
             import psychrolib
             psychrolib.SetUnitSystem(psychrolib.SI)
             TDewPoint = psychrolib.GetTDewPointFromRelHum(dry_temp, rel_hum)
-            self._state = round(TDewPoint, 2)
+            self._state = round(TDewPoint, 1)
