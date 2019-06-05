@@ -89,6 +89,11 @@ class DewPointSensor(Entity):
         return self._name
 
     @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return 'mdi:thermometer-lines'
+
+    @property
     def state(self):
         """Return the state of the sensor."""
         return self._state
