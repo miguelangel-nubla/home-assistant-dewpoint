@@ -107,7 +107,7 @@ class DewPointSensor(Entity):
     def get_dry_temp(self, entity):
         state = self.hass.states.get(entity)
 
-        if state.state is None or state.state == 'unknown':
+        if state is None or state.state is None or state.state == 'unknown':
             _LOGGER.error('Unable to read temperature from unavailable sensor: %s', state.entity_id)
             return
 
@@ -138,7 +138,7 @@ class DewPointSensor(Entity):
     def get_rel_hum(self, entity):
         state = self.hass.states.get(entity)
 
-        if state.state is None or state.state == 'unknown':
+        if state is None or state.state is None or state.state == 'unknown':
             _LOGGER.error('Unable to read relative humidity from unavailable sensor: %s', state.entity_id)
             return
 
