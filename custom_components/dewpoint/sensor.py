@@ -16,11 +16,12 @@ from homeassistant.core import callback
 from homeassistant.const import (
     TEMP_CELSIUS, TEMP_FAHRENHEIT, ATTR_FRIENDLY_NAME, ATTR_ENTITY_ID, CONF_SENSORS,
     EVENT_HOMEASSISTANT_START, ATTR_UNIT_OF_MEASUREMENT, ATTR_TEMPERATURE)
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import Entity, async_generate_entity_id
 from homeassistant.helpers.event import async_track_state_change
 import homeassistant.helpers.config_validation as cv
 
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.components.sensor import (
+    ENTITY_ID_FORMAT, PLATFORM_SCHEMA)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,11 +51,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 class DewPointSensor(Entity):
 
-    def __init__(self, hass, unique_id, name, entity_dry_temp, entity_rel_hum):
+    def __init__(self, hass, device_id, name, entity_dry_temp, entity_rel_hum):
         """Initialize the sensor."""
         self.hass = hass
         self._state = None
-        self._unique_id = unique_id
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT, device_id, hass=hass
+        )
         self._name = name
 
         self._entity_dry_temp = entity_dry_temp
@@ -77,11 +80,6 @@ class DewPointSensor(Entity):
 
         self.hass.bus.async_listen_once(
             EVENT_HOMEASSISTANT_START, sensor_startup)
-
-    @property
-    def unique_id(self):
-        """Return the unique id of the sensor."""
-        return self._unique_id
 
     @property
     def name(self):
